@@ -20,11 +20,12 @@ Lucram pe GitHub prin feature branches simple:
 ## 3. Planificare pe Etape
 
 - **Etapa 2 (Saptamana 7 – Curenta):** Documentatia tehnica.
-- **Etapa 3 (Saptamanile 8 – 12):** Prototip functional:
+- **Etapa 3 (Saptamanile 8 – 10):** Prototip functional End-to-End:
   - Initializarea bazei de date PostgreSQL si crearea tabelelor.
-  - Serverul cu rutele de baza (`/api/auth`, `/api/incidents`, `/api/datasets`).
-  - Worker-ul de citire si parsare streaming pentru fisierele CSV.
-  - Interfata React conectata la rutele de raportare si vizualizare.
-- **Etapa 4 (Saptamanile 12 – 14):** Finalizare si predare:
-  - Panoul de administrare si functia de export a rapoartelor in format CSV.
-  - Validari de securitate anti-XSS pe server, filtrare parametri.
+  - Serverul Go cu rutele de baza pentru operatii CRUD (`/api/auth`, `/api/incidents`, `/api/datasets`).
+  - Algoritmul de citire si parsare pentru fisierele CSV.
+  - Interfata React conectata, permitand efectuarea unor operatii de salvare in baza de date.
+- **Etapa 4 (Saptamanile 10 – 14):** Finalizare si predare:
+  - Panoul de administrare cu functionalitati restrictionate si mecanismul de export al rapoartelor in format CSV.
+  - Validari de securitate anti-XSS pe server, filtrare parametri si protejarea credentialelor.
+  - Ajustari pe frontend pentru accesibilitate, design responsive si validarea datelor.
