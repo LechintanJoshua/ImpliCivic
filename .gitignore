@@ -1,0 +1,5 @@
+.env
+bin/
+*.exe
+api
+.DS_Store
