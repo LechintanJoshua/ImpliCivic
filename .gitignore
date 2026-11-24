@@ -1,5 +1,5 @@
 .env
 bin/
 *.exe
-api
+/api
 .DS_Store
