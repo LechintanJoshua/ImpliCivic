@@ -53,6 +53,11 @@ func main() {
 	mux.HandleFunc("GET /api/health", healthHandler(pool))
 	mux.HandleFunc("POST /api/auth/register", registerHandler(pool))
 	mux.HandleFunc("POST /api/auth/login", loginHandler(pool, jwtSecret))
+	mux.HandleFunc("GET /api/incidents", listIncidentsHandler(pool))
+	mux.HandleFunc("GET /api/incidents/{id}", getIncidentHandler(pool))
+	mux.HandleFunc("POST /api/incidents", requireAuth(jwtSecret, createIncidentHandler(pool)))
+	mux.HandleFunc("GET /api/users/me/incidents", requireAuth(jwtSecret, myIncidentsHandler(pool)))
+	mux.HandleFunc("DELETE /api/incidents/{id}", requireAuth(jwtSecret, deleteIncidentHandler(pool)))
 
 	srv := &http.Server{
 		Addr:         ":" + port,

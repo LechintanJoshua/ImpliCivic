@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// healthHandler verifica daca serverul si baza de date raspund
+// healthHandler (GET /api/health/) verifica daca serverul si baza de date raspund
 func healthHandler(pool *sql.DB) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
