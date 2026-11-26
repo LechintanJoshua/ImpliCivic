@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-// registerHandler valideaza datele primite, hash-uieste parola si
-// creeaza un cont nou de tip citizen
+// registerHandler (POST api/auth/register) valideaza datele primite,
+// hash-uieste parola si creeaza un cont nou de tip citizen
 func registerHandler(pool *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -56,8 +56,8 @@ func registerHandler(pool *sql.DB) http.HandlerFunc {
 	}
 }
 
-// loginHandler verifica email-ul si parola utilizatorului si returneaza
-// un token JWT
+// loginHandler (POST /api/auth/login/) verifica email-ul si parola
+// utilizatorului si returneaza un token JWT
 func loginHandler(pool *sql.DB, jwtSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
