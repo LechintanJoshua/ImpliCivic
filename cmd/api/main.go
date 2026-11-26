@@ -21,6 +21,12 @@ func main() {
 		log.Fatal("DATABASE_URL nu este setat")
 	}
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET nu este setat")
+	}
+
 	pool, err := db.Connect(databaseURL)
 
 	if err != nil {
@@ -45,6 +51,8 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", healthHandler(pool))
+	mux.HandleFunc("POST /api/auth/register", registerHandler(pool))
+	mux.HandleFunc("POST /api/auth/login", loginHandler(pool, jwtSecret))
 
 	srv := &http.Server{
 		Addr:         ":" + port,
