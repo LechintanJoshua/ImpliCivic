@@ -56,8 +56,8 @@ func ListDatasets(ctx context.Context, db *sql.DB, category, search string,
 	SELECT id, dataset_name, category, name, address, latitude, longitude, imported_at
 	FROM public_datasets
 	WHERE ($1 = '' OR category = $1)
-	AND ($2 = '' OR name ILIKE "%" || $2 || "%" OR
-	COALESCE (address, '') ILIKE "%" || $2 || "%")
+	AND ($2 = '' OR name ILIKE '%' || $2 || '%' OR
+	COALESCE (address, '') ILIKE '%' || $2 || '%')
 	ORDER BY id ASC
 	LIMIT $3 OFFSET $4`
 
