@@ -57,3 +57,22 @@ func getClaims(r *http.Request) (auth.Claims, bool) {
 	claims, ok := r.Context().Value(claimsContextKey).(auth.Claims)
 	return claims, ok
 }
+
+// requireAdmin verifica daca utilizatorul este conectat ca admin
+func requireAdmin(jwtSecret string, next http.HandlerFunc) http.HandlerFunc {
+	return requireAuth(jwtSecret, func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := getClaims(r)
+
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+
+		if claims.Role != "admin" {
+			writeError(w, http.StatusForbidden, "admin access required")
+			return
+		}
+
+		next(w, r)
+	})
+}

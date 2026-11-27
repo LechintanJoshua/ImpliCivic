@@ -73,8 +73,7 @@ func listIncidentsHandler(pool *sql.DB) http.HandlerFunc {
 		status := strings.TrimSpace(q.Get("status"))
 		category := strings.TrimSpace(q.Get("category"))
 
-		if status != "" && status != "INREGISTRAT" && status != "IN_LUCRU" &&
-			status != "REZOLVAT" && status != "RESPINS" {
+		if !isValidStatus(status) {
 			writeError(w, http.StatusBadRequest, "invalid status")
 			return
 		}
@@ -182,4 +181,62 @@ func deleteIncidentHandler(pool *sql.DB) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+// updateIncidentHandler (PATCH /api/admin/incidents/{id}) actualizeaza
+// statusul unei sesizari in baza de date
+func updateIncidentHandler(pool *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+
+		if err != nil || id <= 0 {
+			writeError(w, http.StatusBadRequest, "invalid id")
+			return
+		}
+
+		var req struct {
+			Status     string  `json:"status"`
+			AdminNotes *string `json:"admin_notes"`
+		}
+
+		if err := readJSON(w, r, &req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid json")
+			return
+		}
+
+		req.Status = strings.TrimSpace(req.Status)
+
+		if !isValidStatus(req.Status) {
+			writeError(w, http.StatusBadRequest, "invalid status")
+			return
+		}
+
+		if req.AdminNotes != nil {
+			clean := sanitizeText(*req.AdminNotes)
+			req.AdminNotes = &clean
+		}
+
+		incident, err := store.UpdateIncidentStatus(r.Context(), pool, id, req.Status, req.AdminNotes)
+
+		if err != nil {
+			if errors.Is(err, store.ErrIncidentNotFound) {
+				writeError(w, http.StatusNotFound, "no such incident to be updated")
+				return
+			}
+
+			writeError(w, http.StatusInternalServerError, "db error")
+			return
+		}
+
+		writeJSON(w, http.StatusOK, incident)
+	}
+}
+
+// isValidStatus verifica daca statusul respecta cerinta din docs
+func isValidStatus(s string) bool {
+	if s == "INREGISTRAT" || s == "IN_LUCRU" || s == "REZOLVAT" || s == "RESPINS" {
+		return true
+	}
+
+	return false
 }
