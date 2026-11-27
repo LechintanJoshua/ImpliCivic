@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
+	"implicivic/internal/csvproc"
 	"implicivic/internal/db"
+	"implicivic/internal/store"
 	"log"
 	"net/http"
 	"os"
@@ -37,6 +40,21 @@ func main() {
 
 	log.Printf("Conectat la PostgreSQL cu success!")
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	count, err := store.CountDatasets(ctx, pool)
+
+	if err != nil {
+		log.Printf("Eroare la verificarea public_dataset: %v", err)
+	} else if count == 0 {
+		if err := csvproc.ImportDir(ctx, pool, "data"); err != nil {
+			log.Printf("Eroare la importul CSV: %v", err)
+		} else {
+			log.Println("Datele CSV din data/ au fost importate in PostgreSQL!")
+		}
+	}
+
 	port := os.Getenv("PORT")
 
 	if port == "" {
@@ -58,6 +76,7 @@ func main() {
 	mux.HandleFunc("POST /api/incidents", requireAuth(jwtSecret, createIncidentHandler(pool)))
 	mux.HandleFunc("GET /api/users/me/incidents", requireAuth(jwtSecret, myIncidentsHandler(pool)))
 	mux.HandleFunc("DELETE /api/incidents/{id}", requireAuth(jwtSecret, deleteIncidentHandler(pool)))
+	mux.HandleFunc("GET /api/datasets", listDatasetsHandler(pool))
 
 	srv := &http.Server{
 		Addr:         ":" + port,
