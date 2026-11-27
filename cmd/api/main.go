@@ -77,6 +77,8 @@ func main() {
 	mux.HandleFunc("GET /api/users/me/incidents", requireAuth(jwtSecret, myIncidentsHandler(pool)))
 	mux.HandleFunc("DELETE /api/incidents/{id}", requireAuth(jwtSecret, deleteIncidentHandler(pool)))
 	mux.HandleFunc("GET /api/datasets", listDatasetsHandler(pool))
+	mux.HandleFunc("PATCH /api/admin/incidents/{id}", requireAdmin(jwtSecret, updateIncidentHandler(pool)))
+	mux.HandleFunc("GET /api/admin/incidents/export", requireAdmin(jwtSecret, exportIncidentsHandler(pool)))
 
 	srv := &http.Server{
 		Addr:         ":" + port,

@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"errors"
 	"html"
+	"implicivic/internal/csvproc"
 	"implicivic/internal/store"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -239,4 +241,33 @@ func isValidStatus(s string) bool {
 	}
 
 	return false
+}
+
+// exportIncidentsHandler (GET /api/admin/incidents/export)
+func exportIncidentsHandler(pool *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		status := strings.TrimSpace(q.Get("status"))
+		category := strings.TrimSpace(q.Get("category"))
+
+		if status != "" && !isValidStatus(status) {
+			writeError(w, http.StatusBadRequest, "invalid status")
+			return
+		}
+
+		incidents, err := store.ListIncidents(r.Context(), pool, status, category, 0)
+
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "db error")
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/csv;charset=utf-8")
+		w.Header().Set("Content-Disposition", `attachment;filename="sesizari_export.csv"`)
+
+		if err := csvproc.WriteIncidentsCSV(w, incidents); err != nil {
+			log.Printf("Eroare la scriere: %v", err)
+			return
+		}
+	}
 }
