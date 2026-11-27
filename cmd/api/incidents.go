@@ -75,7 +75,7 @@ func listIncidentsHandler(pool *sql.DB) http.HandlerFunc {
 		status := strings.TrimSpace(q.Get("status"))
 		category := strings.TrimSpace(q.Get("category"))
 
-		if !isValidStatus(status) {
+		if status != "" && !isValidStatus(status) {
 			writeError(w, http.StatusBadRequest, "invalid status")
 			return
 		}
