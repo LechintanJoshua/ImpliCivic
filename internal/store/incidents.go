@@ -134,3 +134,29 @@ func DeleteIncident(ctx context.Context, db *sql.DB, id int64) error {
 
 	return nil
 }
+
+// UpdateIncidents actualizeaza statusul, admin_notes si timestamp-ul
+// actualizare unei sesizari in baza de date
+func UpdateIncidentStatus(ctx context.Context, db *sql.DB, id int64, status string, adminNotes *string) (Incident, error) {
+	query := `
+	UPDATE incidents
+	SET status = $1, admin_notes = $2, updated_at = NOW()
+	WHERE id = $3
+	RETURNING id, user_id, title, category, description, address, latitude, longitude,
+	status, admin_notes, created_at, updated_at`
+
+	var i Incident
+
+	if err := db.QueryRowContext(ctx, query, status, adminNotes, id).Scan(&i.ID, &i.UserId, &i.Title,
+		&i.Category, &i.Description, &i.Address, &i.Latitude, &i.Longitude,
+		&i.Status, &i.AdminNotes, &i.CreatedAt, &i.UpdatedAt); err != nil {
+
+		if errors.Is(err, sql.ErrNoRows) {
+			return Incident{}, ErrIncidentNotFound
+		}
+
+		return Incident{}, err
+	}
+
+	return i, nil
+}
