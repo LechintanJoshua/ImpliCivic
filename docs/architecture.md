@@ -1,65 +1,70 @@
 # Arhitectura Aplicatiei – ImpliCivic
 
 ## 1. Structura Generala
-Aplicatia are o arhitectura simpla de tip **Client-Server**:
-- **Client (Frontend):** Interfata web ruleaza integral in browserul utilizatorului si gestioneaza afisarea, interactiunea si cererile asincrone prin API REST.
-- **Server (Backend in Go):** Gestioneaza cererile HTTP, verificarile de acces, logica de prelucrare si comunicarea cu baza de date.
-- **Baza de date (PostgreSQL):** Asigura salvarea persistenta a utilizatorilor, a sesizarilor si a punctelor publice importate.
-- **Stocare locala seturi deschise (CSV):** Fisiere locale cu date publice din Timisoara, procesate la nivel de server.
+Aplicatia urmeaza o arhitectura modulara de tip **Client–Server pe trei niveluri**, conceputa pentru separarea clara a responsabilitatilor:
+- **Client (Frontend):** Interfata web SPA in browser, complet decuplata de server, care gestioneaza afisarea datelor, validarea initiala a formularelor si comunicarea asincrona cu serverul in format JSON.
+- **Server (Backend in Go):** Gestioneaza cererile concurente, politica de acces cross-origin (CORS), autentificarea si controlul accesului pe roluri, sanitizarea datelor, procesarea fisierelor CSV si comunicarea cu baza de date.
+- **Baza de date (PostgreSQL) si Stocarea locala CSV:** PostgreSQL asigura persistenta utilizatorilor, a sesizarilor si a punctelor de interes public; directorul local `data/` stocheaza seturile deschise in format CSV pentru import.
 
+---
 
+## 2. Diagrame Arhitecturale
+Reprezentarile vizuale ale sistemului si ale structurii bazei de date sunt disponibile in format PDF:
+- [Diagrama Arhitecturala (PDF)](../architecture/Arhitectura.pdf)
+- [Diagrama Bazei de Date (PDF)](../architecture/Database.pdf)
 
-## 2. Diagrama Arhitecturala
-Schema vizuala a arhitecturii aplicatiei (interactiunea dintre client, server si baza de date) este disponibila in format PDF in directorul dedicat:
-- 📄 **[Diagrama Arhitecturala (PDF)](diagrams/arhitectura.pdf)**
+---
 
+## 3. Descrierea Componentelor si Comunicarea dintre Ele
 
+### 3.1. Stratul Client (Frontend)
+- **Module de Interfata:** Componente dedicate pentru consultarea catalogului de date publice, raportarea unei sesizari noi, vizualizarea istoricului personal de tichete si panoul de moderare al administratorului.
+- **Gestionarea sesiunii:** Pastreaza token-ul de autentificare primit de la server si il ataseaza cererilor protejate; adapteaza optiunile vizibile in interfata in functie de rolul utilizatorului (`citizen` sau `admin`).
+- **Comunicare cu serverul:** Toate schimburile de date se fac prin cereri asincrone in format JSON (respectiv descarcare directa de fisiere pentru raportul CSV).
 
-## 3. Descrierea Componentelor
+### 3.2. Stratul Server (Backend in Go)
+Backend-ul este organizat in pachete interne independente, astfel incat logica de retea (HTTP), logica criptografica, procesarea de fisiere si accesul la baza de date sa nu fie amestecate:
 
-### 3.1. Frontend
-- **Module de Interfata:** Componente separate care corespund paginilor din aplicatie:
-  - *Catalog Date Deschise:* Afisare tabelara, filtrare dupa categorie si cautare dupa strada/denumire.
-  - *Formular Raportare:* Formular pentru sesizari, preluare coordonate GPS si validare campuri.
-  - *Tichetele Mele:* Lista sesizarilor trimise de utilizator, cu eticheta pentru fiecare stare (`Inregistrat`, `In lucru`, `Rezolvat`).
-  - *Panou Administrator:* Tabel pentru moderarea sesizarilor, schimbare de status si buton de export raport.
-- **Validare pe Client:** Verifica datele inainte de trimitere (campuri obligatorii completate, text existent, coordonate valide) pentru a da erori rapide direct in pagina.
-- **Sesiune si Autentificare:** Retine token-ul primit la login si rolul utilizatorului, `citizen` sau `admin`, afisand optiunile potrivite in meniu.
-- **Serviciu API:** Modul comun care se ocupa de apelurile `fetch()`, trimite datele in format JSON si prinde raspunsurile sau erorile venite de la server.
+- **Stratul HTTP si Middleware (`cmd/api`):**
+  - Porneste serverul cu timeout-uri configurate pentru citire, scriere si conexiuni inactive, tratand fiecare cerere intr-o goroutine separata.
+  - Aplica filtrul **CORS** pentru a permite cererile provenite din originea configurata a frontend-ului si a raspunde direct la cererile de verificare preflight trimise de browser.
+  - Aplica filtrele de **autentificare si autorizare pe roluri**, atasand identitatea utilizatorului in contextul cererii si respingand cererile neautorizate sau pe cele de administrare venite de la conturi obisnuite.
+  - Limiteaza dimensiunea datelor JSON primite, valideaza campurile obligatorii si lungimile textelor, si aplica **curatarea anti-XSS** inainte de salvare.
 
-### 3.2. Backend
-- Toate rutele aplicatiei incep cu prefixul `/api`.
-- **Rutare HTTP:** Trimite cererile primite catre functia potrivita pe baza metodei (GET, POST, PATCH) si a URL-ului.
-- **Autentificare si Drepturi:** Verifica daca utilizatorul este autentificat si ce rol are. Daca un cont obisnuit de cetatean incearca sa apeleze rute de administrare (`/api/admin/*`), serverul refuza cererea direct cu codul `403 Forbidden`.
+- **Stratul de Securitate (`internal/auth`):**
+  - Complet decuplat de baza de date si de HTTP.
+  - Se ocupa de hash-uirea parolelor cu salt aleatoriu si cost ridicat (`bcrypt`) si de generarea, semnarea si verificarea token-urilor de sesiune (`HMAC-SHA256`), folosind comparatii in timp constant si verificare a expirarii.
 
-### 3.3. Handlere si Logica de Aplicatie
-- **Handlere HTTP:** Preiau datele din cerere (JSON), verifica prezenta campurilor obligatorii, curata textul de tag-uri periculoase pentru protectia de baza anti-XSS si apeleaza functiile corespunzatoare pentru salvare.
-- **Procesare fisiere CSV:** Citirea fisierelor mari cu date locale se face linie cu linie, folosind procesare paralela cu goroutines pentru a nu bloca serverul. Randurile corecte sunt salvate in baza de date, iar cele cu erori sunt sarite.
-- **Export CSV:** Citeste sesizarile filtrate din PostgreSQL si genereaza pe loc un fisier `.csv` pe care administratorul il poate descarca direct din browser.
+- **Stratul de Procesare CSV (`internal/csvproc`):**
+  - **Import concurent la pornire:** Citeste fisierele CSV linie cu linie (streaming, fara a incarca intregul fisier in memorie) si distribuie randurile printr-un canal catre un grup de goroutines (worker pool) sincronizate. Randurile corupte sau cu campuri lipsa sunt logate si sarite defensiv fara a opri serverul.
+  - **Export direct:** Genereaza continutul CSV direct in fluxul de raspuns HTTP, fara a crea fisiere temporare pe disc.
 
-### 3.4. Baza de Date
-- **Organizarea interogarilor:** Functiile care lucreaza direct cu tabelele (`users`, `incidents`, `public_datasets`) sunt tinute separat de logica de rute pentru a pastra codul ordonat.
-- **Protectie SQL Injection:** Toate interogarile folosesc parametri (`$1, $2, ...`), astfel incat textul trimis de utilizatori sa nu poata modifica comanda SQL.
-- **Conexiune stabila:** Serverul pastreaza un pool comun de conexiuni catre PostgreSQL, le refoloseste fara a deschide o conexiune noua la fiecare click.
+- **Stratul de Acces la Date (`internal/store`):**
+  - Izoleaza complet interogarile SQL de stratul HTTP, lucrand exclusiv cu modele de date si parametri SQL legati (`$1, $2, ...`) pentru protectia impotriva SQL Injection.
+  - Traduce erorile specifice bazei de date (ex. inregistrari inexistente sau duplicate de unicitate) in erori clare pentru stratul HTTP.
 
+- **Stratul de Baza de Date (`internal/db`):**
+  - Initializeaza si configureaza un **pool comun de conexiuni** reutilizabile intre cererile concurente, cu limite de conexiuni active, conexiuni inactive si durata maxima de viata.
+  - Verifica disponibilitatea serverului PostgreSQL la pornire cu timeout scurt, oprind pornirea daca baza de date nu raspunde.
 
+### 3.3. Stratul de Persistenta (PostgreSQL)
+- Stocheaza permanent tabelele `users`, `incidents` si `public_datasets`, impunand la nivel de schema constrangeri de cheie externa cu stergere in cascada, unicitate pe conturi, precizie fixa pentru coordonate GPS si validari pe valorile permise de rol si status.
 
-## 4. Structura de Directoare a Proiectului
+---
+
+## 4. Structura de Directoare Implementata
 
 ```text
-implicivic/
+ImpliCivic/
 ├── cmd/
-│   └── api/
+│   └── api/                  # Punctul de intrare, server HTTP, middleware si handlere
 ├── internal/
-│   ├── auth/
-│   ├── csvproc/
-│   ├── db/
-│   └── store/
-├── web/
-│   ├── css/
-│   └── js/
-├── data/
-└── docs/
-    ├── diagrams/
-    └── wireframes/
+│   ├── auth/                 # Hash-uire parole si token-uri JWT
+│   ├── csvproc/              # Import concurent CSV si generator export CSV
+│   ├── db/                   # Schema SQL si pool-ul de conexiuni PostgreSQL
+│   └── store/                # Stratul de interogari SQL izolat pe entitati
+├── data/                     # Fisiere CSV locale cu date publice din Timisoara
+├── docs/                     # Documentatia tehnica, modele si testare
+├── architecture/             # Diagramele PDF ale arhitecturii si bazei de date
+└── mockup/                   # Mockup-ul UI in format PDF
 ```
